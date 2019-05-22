@@ -17,8 +17,8 @@ class AbstractTask:
     @classmethod
     def execute(cls, *args, **kwargs):
         cls._pre_execute(**kwargs)
-        cls._execute(**kwargs)
-        return cls._post_execute(**kwargs)
+        result = cls._execute(**kwargs)
+        return cls._post_execute(**kwargs) or result
 
     @classmethod
     def check(cls, **kwargs):
@@ -28,10 +28,12 @@ class AbstractTask:
     def _pre_execute(cls, **kwargs):
         """ Pre execute logic. This method is executed before the main logic in the 'execute' method
             Default approach should exists here like get task_config """
+        cls.depends_on = kwargs.get('depends_on', None)
+        kwargs = kwargs.get('context', kwargs)
 
         # get default params
         cls.task_instance = kwargs.get('task_instance', None)
-        cls.depends_on = kwargs.get('depends_on', None)
+
 
         # get task config from default kwargs (for tests and mocks)
         cls.task_config = kwargs.get('task_config', None)
@@ -57,4 +59,4 @@ class AbstractTask:
     @classmethod
     def _post_execute(cls, **kwargs):
         """ Post execute logic. This method is executed after the main logic in the 'execute' method """
-        return True
+        return None

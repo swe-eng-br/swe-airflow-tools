@@ -34,7 +34,7 @@ class SimpleHttpOperator(AbstractOperator):
         depends on the option that's being modified.
     """
 
-    template_fields = ('endpoint','data',)
+    template_fields = ('endpoint', 'data',)
     template_ext = ()
     ui_color = '#f4a460'
 
@@ -43,9 +43,11 @@ class SimpleHttpOperator(AbstractOperator):
                  endpoint,
                  method='POST',
                  data=None,
-                 data_get=None,
-                 data_get_kwargs=None,
+                 data_method=None,
+                 data_method_kwargs=None,
                  headers=None,
+                 headers_method=None,
+                 headers_method_kwargs=None,
                  response_check=None,
                  extra_options=None,
                  xcom_push=False,
@@ -60,35 +62,44 @@ class SimpleHttpOperator(AbstractOperator):
         self.http_conn_id = http_conn_id
         self.method = method
         self.endpoint = endpoint
-        self.headers = headers or {}
         self.data = data or {}
-        self.data_get = data_get
-        self.data_get_kwargs = data_get_kwargs or {}
+        self.data_method = data_method
+        self.data_method_kwargs = data_method_kwargs or {}
+        self.headers = headers or {}
+        self.headers_method = headers_method
+        self.headers_method_kwargs = headers_method_kwargs or {}
         self.response_check = response_check
         self.extra_options = extra_options or {}
         self.xcom_push_flag = xcom_push
 
-    def _execute(self, context):
-        if self.data_get:
-            _data_get_kwargs = dict(self.data_get_kwargs)
-            _data_get_kwargs.update({'task_instance': context.get('task_instance', {})})
-            _data = self.data_get(**_data_get_kwargs)
+    def _execute(self, **context):
+
+        if self.data_method:
+            kwargs = dict(self.data_method_kwargs)
+            kwargs.update(context)
+            data = self.data_method(**kwargs)
         else:
-            _data = self.data
+            data = self.data
+
+        if self.headers_method:
+            kwargs = dict(self.headers_method_kwargs)
+            kwargs.update(context)
+            headers = self.headers_method(**kwargs)
+        else:
+            headers = self.headers
+
+        logging.info("Calling HTTP method.")
+
         http = HttpHook(self.method, http_conn_id=self.http_conn_id)
-        logging.info("Calling HTTP method")
+        response = http.run(self.endpoint, data, headers, self.extra_options)
 
-        try:
-            response = http.run(self.endpoint,
-                                _data,
-                                self.headers,
-                                self.extra_options)
-        except:
-            raise
-
+        result = None
         if self.response_check:
-            if not self.response_check(response):
+            result = self.response_check(response=response, **context)
+            if not result:
                 raise AirflowException("Response check returned False.")
-        if self.xcom_push_flag:
-            return response.text
+
+        if self.xcom_push_flag and result:
+            return result
+
         return True

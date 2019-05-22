@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 from collections import defaultdict
 
@@ -6,14 +7,16 @@ from airflow.models import BaseOperator
 
 class AbstractOperator(BaseOperator):
 
-    def execute(self, context):
+    def execute(self, **context):
         self._pre_execute(context)
-        self._execute(context)
-        self._post_execute(context)
+        result = self._execute(**context)
+        return self._post_execute(**context) or result
 
     def _pre_execute(self, context):
         """ Pre execute logic. This method is executed before the main logic in the 'execute' method
             Default approach should exists here like get task_config """
+
+        context = dict(context.get('context', {}))
 
         # get default params
         self.task_instance = context.get('task_instance', None)
@@ -30,8 +33,8 @@ class AbstractOperator(BaseOperator):
                     for key, value in config.items():
                         self.task_config[key].append(value)
 
-    def _execute(self, context):
-        pass
+    def _execute(self, **context):
+        return None
 
-    def _post_execute(self, context):
-        pass
+    def _post_execute(self, **context):
+        return None
